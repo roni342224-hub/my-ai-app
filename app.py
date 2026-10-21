@@ -1,151 +1,115 @@
-import os
-import urllib.parse
-from google import genai
 import streamlit as st
+from google import genai
+from google.genai import types
 
-# הגדרות עמוד בעיצוב נקי וכהה
+# הגדרת עמוד
 st.set_page_config(
-    page_title="AI Explorer", page_icon="🌐", layout="wide", initial_sidebar_state="collapsed"
+    page_title="ChatGPT Style AI",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# הזרקת עיצוב CSS מותאם אישית למראה המינימליסטי הכהה שבתמונה
-st.markdown(
-    """
+# עיצוב CSS מותאם אישית להשגת מראה מדויק כמו ChatGPT ותמיכה בעברית (RTL)
+st.markdown("""
     <style>
+    /* רקע כהה כללי ויישור לימין */
     .stApp {
-        background-color: #0b0b0b;
-        color: #ffffff;
+        background-color: #212121;
+        color: #ececec;
         direction: rtl;
-    }
-    /* הסתרת אלמנטים מיותרים של Streamlit למראה נקי */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* עיצוב תיבת הקלט המרכזית */
-    .stChatInputContainer {
-        max-width: 750px;
-        margin: auto;
-    }
-    .stChatInput input {
-        background-color: #161618 !important;
-        color: #ffffff !important;
-        border-radius: 28px !important;
-        border: 1px solid #2d2d30 !important;
-        padding: 12px 20px !important;
+        text-align: right;
     }
     
-    /* עיצוב כפתורי ההתחברות למעלה */
-    .top-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px 30px;
-        background-color: #0b0b0b;
+    /* הסתרת כותרות סטנדרטיות של סטרימליט לטובת עיצוב נקי */
+    header {visibility: hidden;}
+    
+    /* סרגל צד (Sidebar) כהה */
+    [data-testid="stSidebar"] {
+        background-color: #171717;
+        border-left: 1px solid #2f2f2f;
+    }
+
+    /* כותרת מרכזית בסגנון ChatGPT */
+    .chatgpt-header {
+        font-size: 2.2rem;
+        font-weight: 600;
+        text-align: center;
+        color: #ececec;
+        margin-top: 15vh;
+        margin-bottom: 2rem;
+    }
+
+    /* עיצוב תיבת הקלט למטה */
+    .stChatInputContainer {
+        padding-bottom: 20px;
+    }
+    
+    /* עיצוב אזור התשובות */
+    .stChatMessage {
+        background-color: #2f2f2f;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 10px;
     }
     </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# סרגל עליון (לוגו בצד שמאל/ימין וכפתורי התחברות)
-col_logo, col_buttons = st.columns([8, 2])
-with col_logo:
-  st.markdown(
-      "<h3 style='color: #ffffff; margin: 0;'>🌐 Explorer</h3>",
-      unsafe_allow_html=True,
-  )
-with col_buttons:
-  # כפתורי Sign in / Sign up דמויים
-  b_col1, b_col2 = st.columns(2)
-  with b_col1:
-    if st.button("התחבר", use_container_width=True):
-      st.info(
-          "מצב התחברות פעיל (מחובר כמשתמש אורח עם מפתח API אישי)."
-      )
-  with b_col2:
-    if st.button("הרשמה", use_container_width=True):
-      st.success("ברוך הבא! האפליקציה מוכנה לשימוש.")
+# סרגל צד (Sidebar)
+with st.sidebar:
+    st.markdown("### ⚙️ הגדרות מערכת")
+    api_key = st.text_input("הכנס Google Gemini API Key:", type="password", placeholder="AIzaSy...")
+    st.markdown("---")
+    st.markdown("**תכונות המערכת:**")
+    st.markdown("- מודל Gemini 2.5 Flash")
+    st.markdown("- חיפוש בגוגל בזמן אמת (Grounding)")
+    st.markdown("- ממשק עברי מלא (RTL)")
 
-st.markdown("<br><br>", unsafe_allow_html=True)
-
-# הכנס כאן את ה-API Key שלך בין המרכאות
-API_KEY = "AQ.Ab8RN6LcJJnwnP6oGRNTlmlrUln79M4YcGejA-Um_awk3wSGYg"
-
-# חיבור ללקוח ה-API
-client = genai.Client(api_key=API_KEY)
-
-# ניהול היסטוריית השיחה
+# ניהול היסטוריית צ'אט בזיכרון של Streamlit
 if "messages" not in st.session_state:
-  st.session_state.messages = []
+    st.session_state.messages = []
 
-# אם אין הודעות עדיין - נציג את המסך הראשי המרכזי כמו בתמונה
-if len(st.session_state.messages) == 0:
-  st.markdown(
-      "<h1 style='text-align: center; color: #ffffff; font-size: 3rem;"
-      " margin-bottom: 20px;'>מה נרצה לחקור?</h1>",
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      "<p style='text-align: center; color: #8e918f; font-size: 1.1rem;'>שאל"
-      " כל דבר או כתוב <b>'תמונה:'</b> ואחריה תיאור כדי ליצור תמונה"
-      " מדהימה</p>",
-      unsafe_allow_html=True,
-  )
-  st.markdown("<br>", unsafe_allow_html=True)
+# אם אין עדיין שיחות, הצג את מסך הפתיחה המרכזי בסגנון ChatGPT
+if not st.session_state.messages:
+    st.markdown('<div class="chatgpt-header">איפה נתחיל היום?</div>', unsafe_allow_html=True)
 
-# הצגת היסטוריית ההודעות בצ'אט
+# הצגת היסטוריית ההודעות
 for message in st.session_state.messages:
-  with st.chat_message(message["role"]):
-    if message.get("type") == "image":
-      st.image(message["content"])
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# תיבת הקלט של הצ'אט (יושבת אוטומטית למטה כמו ב-ChatGPT)
+if prompt := st.chat_input("שאל את המודל או בקש חיפוש מהרשת..."):
+    if not api_key:
+        st.error("אנא הכנס את מפתח ה-API בסיידבר מצד שמאל כדי להתחיל לשוחח.")
     else:
-      st.markdown(message["content"])
+        # הוספת הודעת המשתמש להיסטוריה
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-# תיבת הקלט בתחתית העמוד
-if prompt := st.chat_input("שאל את המודל או בקש תמונה..."):
-  # הצגת הודעת המשתמש
-  st.session_state.messages.append({"role": "user", "content": prompt})
-  with st.chat_message("user"):
-    st.markdown(prompt)
+        # יצירת תשובה מהמודל עם חיפוש בגוגל
+        with st.chat_message("assistant"):
+            with st.spinner("חושב ומחפש בגוגל..."):
+                try:
+                    client = genai.Client(api_key=api_key)
+                    
+                    # בניית היסטוריית השיחה למודל
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            tools=[types.Tool(google_search=types.GoogleSearch())],
+                            temperature=0.3,
+                        ),
+                    )
+                    
+                    answer = response.text
+                    st.markdown(answer)
+                    
+                    # הוספת התשובה להיסטוריה
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-  # מענה של ה-AI עם טיפול בשגיאות עומס
-  with st.chat_message("assistant"):
-    try:
-      if prompt.startswith("תמונה:"):
-        hebrew_prompt = prompt.replace("תמונה:", "").strip()
-
-        # תרגום חכם לאנגלית דרך המודל היציב
-        translation_response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=(
-                "Translate this image description to a detailed English prompt"
-                f" for an AI image generator, return ONLY the translated prompt:"
-                f" {hebrew_prompt}"
-            ),
-        )
-        english_prompt = translation_response.text.strip()
-
-        encoded_prompt = urllib.parse.quote(english_prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-
-        st.image(image_url, caption=f"תמונה עבור: {hebrew_prompt}")
-        st.session_state.messages.append(
-            {"role": "assistant", "content": image_url, "type": "image"}
-        )
-      else:
-        # מענה טקסטואלי רגיל
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt,
-        )
-        st.markdown(response.text)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": response.text}
-        )
-    except Exception as e:
-      error_message = (
-          "⚠️ השרתים עמוסים כרגע (שגיאת עומס זמנית). המתן מספר שניות ונסח את"
-          " הודעתך מחדש."
-      )
-      st.error(error_message)
+                except Exception as e:
+                    error_msg = f"אירעה שגיאה: {e}"
+                    st.error(error_msg)
