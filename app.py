@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# הגדרת עמוד
+# ====================== הגדרת עמוד ======================
 st.set_page_config(
     page_title="ChatGPT Style AI",
     page_icon="🤖",
@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# עיצוב CSS (RTL + כהה)
+# ====================== עיצוב CSS (RTL + כהה) ======================
 st.markdown("""
 <style>
 .stApp {
@@ -24,9 +24,6 @@ header {visibility: hidden;}
     background-color: #171717;
     border-left: 1px solid #2f2f2f;
     padding-top: 20px;
-}
-.login-card {
-    background: #2f2f2f;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -67,20 +64,28 @@ if prompt := st.chat_input("כתוב הודעה..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # בניית היסטוריה ל-Gemini (בפורמט הנכון)
+    # בניית היסטוריה ל-Gemini
     history = []
     for msg in st.session_state.messages[:-1]:  # בלי ההודעה האחרונה
         role = "user" if msg["role"] == "user" else "model"
-        history.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
+        history.append(
+            types.Content(
+                role=role, 
+                parts=[types.Part(text=msg["content"])]
+            )
+        )
 
     # קריאה ל-Gemini עם זיכרון + System Instruction
     with st.chat_message("assistant"):
         with st.spinner("חושב..."):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",          # או gemini-1.5-flash / gemini-1.5-pro
+                    model="gemini-2.0-flash",  # אפשר גם gemini-1.5-flash או gemini-1.5-pro
                     contents=history + [
-                        types.Content(role="user", parts=[types.Part(text=prompt)])
+                        types.Content(
+                            role="user", 
+                            parts=[types.Part(text=prompt)]
+                        )
                     ],
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
@@ -92,15 +97,19 @@ if prompt := st.chat_input("כתוב הודעה..."):
                 st.markdown(answer)
                 
                 # שמירת התשובה בזיכרון
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": answer
+                })
                 
             except Exception as e:
                 st.error(f"שגיאה: {e}")
 
-# כפתור לניקוי השיחה
+# ====================== סיידבר ======================
 with st.sidebar:
     st.header("הגדרות")
-    if st.button("🗑️ נקה שיחה"):
+    
+    if st.button("🗑️ נקה שיחה", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
     
