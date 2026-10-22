@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# הגדרת עמוד רחבה
+# הגדרת עמוד
 st.set_page_config(
     page_title="ChatGPT Style AI",
     page_icon="🤖",
@@ -10,169 +10,100 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# עיצוב CSS מתקדם בסגנון ChatGPT ומותאם לעברית (RTL)
+# עיצוב CSS (RTL + כהה)
 st.markdown("""
-    <style>
-    .stApp {
-        background-color: #212121;
-        color: #ececec;
-        direction: rtl;
-        text-align: right;
-    }
-    header {visibility: hidden;}
-
-    [data-testid="stSidebar"] {
-        background-color: #171717;
-        border-left: 1px solid #2f2f2f;
-        padding-top: 20px;
-    }
-
-    .login-card {
-        background: #2f2f2f;
-        padding: 40px;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        border: 1px solid #3f3f3f;
-        max-width: 420px;
-        margin: 12vh auto;
-        text-align: center;
-    }
-
-    .login-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 8px;
-    }
-
-    .login-subtitle {
-        color: #9b9b9b;
-        font-size: 0.95rem;
-        margin-bottom: 25px;
-    }
-
-    .stButton button {
-        border-radius: 10px;
-        font-weight: 600;
-        background: #2f2f2f;
-        color: white;
-        border: 1px solid #4f4f4f;
-        transition: 0.2s;
-    }
-    .stButton button:hover {
-        background: #3f3f3f;
-        border-color: #6f6f6f;
-    }
-
-    .chat-main-title {
-        font-size: 2.2rem;
-        font-weight: 600;
-        text-align: center;
-        margin-top: 15vh;
-        margin-bottom: 2rem;
-        color: #ececec;
-    }
-
-    .stChatMessage {
-        background-color: #2f2f2f;
-        border-radius: 12px;
-        padding: 16px;
-        border: 1px solid #3f3f3f;
-        margin-bottom: 12px;
-    }
-    </style>
+<style>
+.stApp {
+    background-color: #212121;
+    color: #ececec;
+    direction: rtl;
+    text-align: right;
+}
+header {visibility: hidden;}
+[data-testid="stSidebar"] {
+    background-color: #171717;
+    border-left: 1px solid #2f2f2f;
+    padding-top: 20px;
+}
+.login-card {
+    background: #2f2f2f;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# ניהול מצב התחברות
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_email" not in st.session_state:
-    st.session_state.user_email = ""
+# ====================== הגדרות ======================
+# הכנס כאן את ה-API Key שלך (או תשתמש ב-secrets)
+API_KEY = st.secrets.get("GOOGLE_API_KEY", "הכנס-כאן-את-המפתח-שלך")
 
-# ניהול היסטוריית צ'אטים מרובים
-if "chats" not in st.session_state:
-    st.session_state.chats = {"שיחה חדשה 1": []}
-if "current_chat" not in st.session_state:
-    st.session_state.current_chat = "שיחה חדשה 1"
+# הוראות מערכת – כאן אתה קובע איך ה-AI יתנהג
+SYSTEM_INSTRUCTION = """
+אתה עוזר AI ידידותי ומנומס שמדבר בעברית.
+- אם מישהו כותב "שלום" או "היי" או "בוקר טוב" וכו' – תענה בצורה חמה כמו: "שלום! איך אוכל לעזור לך היום? 😊"
+- תמיד תענה בעברית.
+- תהיה קצר וברור אלא אם מבקשים הסבר ארוך.
+- תזכור את כל מה שנאמר בשיחה ותשתמש בזה.
+"""
 
-# --- מסך התחברות ---
-if not st.session_state.logged_in:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown("""
-            <div class="login-card">
-                <div class="login-title">ברוך הבא ל-AI</div>
-                <div class="login-subtitle">התחבר באמצעות חשבון Google כדי להמשיך</div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        email_input = st.text_input("כתובת אימייל", placeholder="name@example.com")
-        pass_input = st.text_input("סיסמה", type="password", placeholder="••••••••")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("התחבר", use_container_width=True):
-                if email_input.strip():
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = email_input
-                    st.rerun()
-                else:
-                    st.error("נא להזין אימייל")
-        with c2:
-            if st.button("🔵 התחבר עם Google", use_container_width=True):
-                st.session_state.logged_in = True
-                st.session_state.user_email = "user@gmail.com"
-                st.rerun()
+# אתחול הלקוח
+client = genai.Client(api_key=API_KEY)
 
-# --- האפליקציה הראשית ---
-else:
-    with st.sidebar:
-        st.markdown(f"👤 **{st.session_state.user_email}**")
-        st.markdown("---")
-        
-        if st.button("➕ צ'אט חדש", use_container_width=True):
-            new_chat_name = f"שיחה {len(st.session_state.chats) + 1}"
-            st.session_state.chats[new_chat_name] = []
-            st.session_state.current_chat = new_chat_name
-            st.rerun()
+# ====================== זיכרון השיחה ======================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-        st.markdown("### 💬 היסטוריית שיחות")
-        chat_names = list(st.session_state.chats.keys())
-        for chat_name in chat_names:
-            if st.button(chat_name, use_container_width=True, key=f"btn_{chat_name}"):
-                st.session_state.current_chat = chat_name
-                st.rerun()
+# כותרת
+st.title("🤖 הצ'אט שלי")
 
-        st.markdown("---")
-        
-        # טעינת מפתח API אוטומטית מ-Secrets של Streamlit (אם מוגדר), או מתן אפשרות להזין ידנית
-        secret_key = ""
-        try:
-            secret_key = st.secrets.get("GEMINI_API_KEY", "")
-        except Exception:
-            pass
+# הצגת היסטוריית השיחה
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-        if secret_key:
-            api_key = secret_key
-            st.success("🔑 מפתח ה-API טעון אוטומטית מהמערכת!")
-        else:
-            api_key = st.text_input("Gemini API Key:", type="password", placeholder="AIzaSy...")
+# קלט מהמשתמש
+if prompt := st.chat_input("כתוב הודעה..."):
+    # הוספת הודעת המשתמש להיסטוריה
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-        st.markdown("---")
-        if st.button("🚪 התנתק", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.chats = {"שיחה חדשה 1": []}
-            st.rerun()
+    # בניית היסטוריה ל-Gemini (בפורמט הנכון)
+    history = []
+    for msg in st.session_state.messages[:-1]:  # בלי ההודעה האחרונה
+        role = "user" if msg["role"] == "user" else "model"
+        history.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
 
-    current_messages = st.session_state.chats[st.session_state.current_chat]
+    # קריאה ל-Gemini עם זיכרון + System Instruction
+    with st.chat_message("assistant"):
+        with st.spinner("חושב..."):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",          # או gemini-1.5-flash / gemini-1.5-pro
+                    contents=history + [
+                        types.Content(role="user", parts=[types.Part(text=prompt)])
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.7,
+                    )
+                )
+                
+                answer = response.text
+                st.markdown(answer)
+                
+                # שמירת התשובה בזיכרון
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                
+            except Exception as e:
+                st.error(f"שגיאה: {e}")
 
-    if not current_messages:
-        st.markdown(f'<div class="chat-main-title">איפה נתחיל היום?</div>', unsafe_allow_html=True)
-
-    for message in current_messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("שאל את המודל או בקש חיפוש מהרשת..."):
-        if not api_key:
-            st.error("🔒 נא להזין את מפתח ה-API בסיידבר מצד שמאל או להגדיר
+# כפתור לניקוי השיחה
+with st.sidebar:
+    st.header("הגדרות")
+    if st.button("🗑️ נקה שיחה"):
+        st.session_state.messages = []
+        st.rerun()
+    
+    st.markdown("---")
+    st.markdown("**הוראות מערכת נוכחיות:**")
+    st.code(SYSTEM_INSTRUCTION, language="text")
