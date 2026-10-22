@@ -30,7 +30,7 @@ header {visibility: hidden;}
 
 # ====================== הגדרות ======================
 # הכנס כאן את ה-API Key שלך (או תשתמש ב-secrets)
-API_KEY = st.secrets.get("GOOGLE_API_KEY", "הכנס-כאן-את-המפתח-שלך")
+API_KEY = st.secrets.get("AQ.Ab8RN6J7hlylISZfHTpyZToWGx3I6MmKg-smCrF2U5bTHQziCA")
 
 # הוראות מערכת – כאן אתה קובע איך ה-AI יתנהג
 SYSTEM_INSTRUCTION = """
